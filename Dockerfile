@@ -1,14 +1,17 @@
-FROM alpine:edge
+FROM golang:alpine as builder
 
-ARG PORT=80
+RUN apk add --no-cache make git
+WORKDIR /toshiki-proxypool-src
+COPY . /toshiki-proxypool-src
+RUN go mod download && \
+    make docker && \
+    mv ./bin/toshiki-proxypool-docker /toshiki-proxypool
 
-ADD start.sh /start.sh
+FROM alpine:latest
 
-RUN apk update && \
-    apk add --no-cache ca-certificates wget && \
-    wget -O config.yaml https://raw.githubusercontent.com/andatoshiki/toshiki-proxypool/master/config/config.yaml && \
-    wget -O source.yaml https://raw.githubusercontent.com/andatoshiki/toshiki-proxypool/master/config/source.yaml && \
-    
-RUN chmod +x /start.sh
-
-CMD /start.sh
+RUN apk add --no-cache ca-certificates tzdata
+WORKDIR /toshiki-proxypool-src
+COPY ./assets /toshiki-proxypool-src/assets
+COPY ./config /toshiki-proxypool-src/config
+COPY --from=builder /toshiki-proxypool /toshiki-proxypool-src/
+ENTRYPOINT ["/toshiki-proxypool-src/toshiki-proxypool", "-d"]
